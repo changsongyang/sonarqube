@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 /**
  * TODO no shutdown hook in this class
  */
-public interface ProcessGroupMonitor {
+public interface ProcessGroupMonitor extends AutoCloseable {
 
   List<SQProcess> getProcesses();
 
@@ -39,4 +39,6 @@ public interface ProcessGroupMonitor {
   void register(Consumer<ChangeEvent> listener);
 
   void close();
+
+  void stopAll();
 }

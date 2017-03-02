@@ -24,10 +24,6 @@ public class ChangeEvent {
      * A stop was requested by a process
      */
     STOP_REQUESTED,
-    /**
-     * The process was unable to start
-     */
-    UNABLE_TO_START,
   }
 
   private final Optional<SQProcess> sqProcess;

@@ -26,14 +26,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import javax.annotation.CheckForNull;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.process.AllProcessesCommands;
 import org.sonar.process.ProcessCommands;
-import org.sonar.process.ProcessEntryPoint;
 import org.sonar.process.ProcessUtils;
+import sun.rmi.runtime.Log;
 
 import static org.sonar.process.ProcessEntryPoint.PROPERTY_PROCESS_INDEX;
 import static org.sonar.process.ProcessEntryPoint.PROPERTY_PROCESS_KEY;
@@ -46,8 +45,6 @@ class JavaProcessLauncher {
   private final Timeouts timeouts;
   private final File tempDir;
   private final AllProcessesCommands allProcessesCommands;
-  @CheckForNull
-  private JavaProcessLauncher launcher;
 
   JavaProcessLauncher(Timeouts timeouts, File tempDir) {
     this.timeouts = timeouts;
@@ -61,8 +58,10 @@ class JavaProcessLauncher {
 
   SQProcess launch(JavaCommand javaCommand) {
     Process process = null;
+    ProcessCommands commands = null;
+    StreamGobbler inputGobbler = null;
     try {
-      ProcessCommands commands = allProcessesCommands.createAfterClean(javaCommand.getProcessId().getIpcIndex());
+      commands = allProcessesCommands.createAfterClean(javaCommand.getProcessId().getIpcIndex());
 
       ProcessBuilder processBuilder = create(javaCommand);
       LOG.info("Launch process[{}]: {}",
@@ -70,14 +69,17 @@ class JavaProcessLauncher {
         StringUtils.join(processBuilder.command(), " ")
       );
       process = processBuilder.start();
-      StreamGobbler inputGobbler = new StreamGobbler(process.getInputStream(), javaCommand.getProcessId().getKey());
+      inputGobbler = new StreamGobbler(process.getInputStream(), javaCommand.getProcessId().getKey());
       inputGobbler.start();
 
       return new SQProcess(javaCommand, commands, process, inputGobbler);
     } catch (Exception e) {
+      LOG.error(
+        String.format("Fail to launch [%s]", javaCommand.getProcessId().getKey()),
+        e);
       // just in case
       ProcessUtils.sendKillSignal(process);
-      throw new IllegalStateException("Fail to launch [" + javaCommand.getProcessId().getKey() + "]", e);
+      return new SQProcess(javaCommand, commands, process, inputGobbler);
     }
   }
 
@@ -87,7 +89,6 @@ class JavaProcessLauncher {
     commands.addAll(javaCommand.getJavaOptions());
     // TODO warning - does it work if temp dir contains a whitespace ?
     commands.add(String.format("-Djava.io.tmpdir=%s", tempDir.getAbsolutePath()));
-    commands.add(getJmxAgentCommand());
     commands.addAll(buildClasspath(javaCommand));
     commands.add(javaCommand.getClassName());
     commands.add(buildPropertiesFile(javaCommand).getAbsolutePath());
@@ -98,15 +99,6 @@ class JavaProcessLauncher {
     processBuilder.environment().putAll(javaCommand.getEnvVariables());
     processBuilder.redirectErrorStream(true);
     return processBuilder;
-  }
-
-  /**
-   * JVM option to enable the agent that allows inter-process communication through JMX without
-   * opening new ports. The agent is available in JRE of OpenJDK/OracleJDK only.
-   * @see ProcessEntryPoint
-   */
-  private static String getJmxAgentCommand() {
-    return "-javaagent:" + System.getProperty("java.home") + File.separator + "lib" + File.separator + "management-agent.jar";
   }
 
   private String buildJavaPath() {

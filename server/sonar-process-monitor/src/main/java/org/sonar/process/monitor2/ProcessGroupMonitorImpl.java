@@ -24,7 +24,9 @@ package org.sonar.process.monitor2;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import javax.annotation.CheckForNull;
@@ -32,13 +34,15 @@ import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ProcessGroupMonitorImpl implements ProcessGroupMonitor, AutoCloseable {
+public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   private static final Logger LOG = LoggerFactory.getLogger(ProcessGroupMonitorImpl.class);
+  private static final long WATCH_DELAY_MS = 500L;
 
   private final List<SQProcess> processes = new ArrayList<>();
   private final List<Consumer<ChangeEvent>> listeners = new ArrayList<>();
   private final FileSystem fileSystem;
   private final List<WatcherThread> watcherThreads = new CopyOnWriteArrayList<>();
+  private final StateWatcherThread stateWatcherThread = new StateWatcherThread(Collections.unmodifiableList(processes));
 
   @CheckForNull
   private JavaProcessLauncher launcher;
@@ -69,13 +73,14 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor, AutoCloseab
       sqProcess = launcher.launch(javaCommand);
       monitor(sqProcess);
     } catch (InterruptedException | RuntimeException e) {
-      if (sqProcess != null) {
-        LOG.error("{} failed to start", sqProcess);
-      }
+      LOG.error(
+        String.format("%s failed to start", sqProcess),
+        e
+      );
       if (sqProcess == null) {
         sqProcess = new SQProcess(javaCommand, null, null,null);
       }
-      sendChangeEvent(new ChangeEvent(sqProcess, ChangeEvent.Type.UNABLE_TO_START));
+      sendChangeEvent(new ChangeEvent(sqProcess, ChangeEvent.Type.PROCESS_STATE_CHANGE));
     }
 
     return sqProcess;
@@ -98,7 +103,54 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor, AutoCloseab
 
   @Override
   public void close() {
+    stateWatcherThread.finish();
     launcher.close();
+  }
+
+  @Override
+  public void stopAll() {
+    // TODO
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Watches for state change in processes
+   */
+  private class StateWatcherThread extends Thread {
+    private final List<SQProcess> sqProcesses;
+    private final Map<SQProcess, SQProcess.State> previousStates = new HashMap<>();
+    private boolean stopRequested = false;
+
+    private StateWatcherThread(@Nonnull List<SQProcess> sqProcesses) {
+      super("State watcher");
+      this.sqProcesses = sqProcesses;
+    }
+
+    @Override
+    public void run() {
+      while (!stopRequested) {
+        detectStateChanges();
+        try {
+          Thread.sleep(WATCH_DELAY_MS);
+        } catch (InterruptedException ignored) {
+          // keep watching
+        }
+      }
+    }
+
+    private void finish() {
+      stopRequested = true;
+    }
+
+    private void detectStateChanges() {
+      sqProcesses.forEach(sqProcess -> {
+        SQProcess.State previousState = previousStates.get(sqProcess);
+        if (sqProcess.getState() != previousState) {
+          sendChangeEvent(new ChangeEvent(sqProcess, ChangeEvent.Type.PROCESS_STATE_CHANGE));
+          previousStates.put(sqProcess, sqProcess.getState());
+        }
+      });
+    }
   }
 
   private void monitor(SQProcess sqProcess) throws InterruptedException {

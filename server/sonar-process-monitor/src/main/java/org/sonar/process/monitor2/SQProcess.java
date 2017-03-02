@@ -12,17 +12,17 @@ public class SQProcess {
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(SQProcess.class);
+
   private final JavaCommand javaCommand;
   private final ProcessCommands commands;
   private final Process process;
   private final StreamGobbler gobbler;
-  private volatile boolean stopped = false;
+  private State state;
 
   SQProcess(JavaCommand javaCommand, ProcessCommands commands, Process process, StreamGobbler gobbler) {
     this.javaCommand = javaCommand;
     this.commands = commands;
     this.process = process;
-    this.stopped = !ProcessUtils.isAlive(process);
     this.gobbler = gobbler;
   }
 
@@ -56,7 +56,6 @@ public class SQProcess {
     }
     ProcessUtils.closeStreams(process);
     StreamGobbler.waitUntilFinish(gobbler);
-    stopped = true;
   }
 
 
@@ -65,7 +64,21 @@ public class SQProcess {
   }
 
   public State getState() {
-    throw new UnsupportedOperationException();
+    if (process == null || !ProcessUtils.isAlive(process)) {
+      return State.STOPPED;
+    }
+
+    if (commands.isUp()) {
+      return State.UP;
+    }
+    if (commands.isOperational()) {
+      return State.OPERATIONAL;
+    }
+    if (commands.askedForStop()) {
+      return State.STOPPING;
+    }
+    // TODO ? STARTING ?
+    return State.INIT;
   }
 
   @Override
