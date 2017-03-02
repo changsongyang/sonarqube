@@ -38,6 +38,7 @@ public interface ProcessGroupMonitor extends AutoCloseable {
 
   void register(Consumer<ChangeEvent> listener);
 
+  @Override
   void close();
 
   void stopAll();

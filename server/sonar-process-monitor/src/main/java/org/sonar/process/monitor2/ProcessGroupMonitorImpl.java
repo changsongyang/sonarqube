@@ -109,6 +109,8 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
 
   @Override
   public void stopAll() {
+    stateWatcherThread.finish();
+    launcher.close();
     // TODO
     throw new UnsupportedOperationException();
   }
@@ -146,6 +148,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
       sqProcesses.forEach(sqProcess -> {
         SQProcess.State previousState = previousStates.get(sqProcess);
         if (sqProcess.getState() != previousState) {
+          // TODO send a bean instead of sqProcess.
           sendChangeEvent(new ChangeEvent(sqProcess, ChangeEvent.Type.PROCESS_STATE_CHANGE));
           previousStates.put(sqProcess, sqProcess.getState());
         }

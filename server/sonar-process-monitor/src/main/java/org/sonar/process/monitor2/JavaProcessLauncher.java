@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import org.sonar.process.AllProcessesCommands;
 import org.sonar.process.ProcessCommands;
 import org.sonar.process.ProcessUtils;
-import sun.rmi.runtime.Log;
 
 import static org.sonar.process.ProcessEntryPoint.PROPERTY_PROCESS_INDEX;
 import static org.sonar.process.ProcessEntryPoint.PROPERTY_PROCESS_KEY;

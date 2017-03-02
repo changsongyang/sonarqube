@@ -67,7 +67,6 @@ public class SQProcess {
     if (process == null || !ProcessUtils.isAlive(process)) {
       return State.STOPPED;
     }
-
     if (commands.isUp()) {
       return State.UP;
     }
@@ -78,7 +77,7 @@ public class SQProcess {
       return State.STOPPING;
     }
     // TODO ? STARTING ?
-    return State.INIT;
+    return State.STARTING;
   }
 
   @Override
