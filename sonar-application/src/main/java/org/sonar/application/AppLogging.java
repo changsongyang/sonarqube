@@ -132,7 +132,11 @@ class AppLogging {
     helper.apply(
       LogLevelConfig.newBuilder()
         .rootLevelFor(ProcessId.APP)
-        .immutableLevel("com.hazelcast", Level.toLevel(props.value(ClusterParameters.HAZELCAST_LOG_LEVEL.getName())))
+        .immutableLevel("com.hazelcast",
+          Level.toLevel(
+            props.value(ClusterParameters.HAZELCAST_LOG_LEVEL.getName(),  ClusterParameters.HAZELCAST_LOG_LEVEL.getDefaultValue())
+          )
+        )
         .build(), props);
 
     return ctx;
