@@ -2,17 +2,63 @@ package org.sonar.process.monitor2;
 
 import java.util.Optional;
 
+
+/**
+ * The change event from a SQProcess
+ */
 public class ChangeEvent {
 
+  /**
+   * Type of the change
+   */
   public enum Type {
-    RESTART_REQUESTED, PROCESS_STATE_CHANGE, STOP_REQUESTED
+    /**
+     * A restart was requested by a process
+     */
+    RESTART_REQUESTED,
+    /**
+     * Process has change its state
+     */
+    PROCESS_STATE_CHANGE,
+    /**
+     * A stop was requested by a process
+     */
+    STOP_REQUESTED,
+    /**
+     * The process was unable to start
+     */
+    UNABLE_TO_START,
   }
 
+  private final Optional<SQProcess> sqProcess;
+  private final Type type;
+
+  /**
+   * Instantiates a new Change event.
+   *
+   * @param sqProcess the sq process
+   * @param type      the type
+   */
+  public ChangeEvent(SQProcess sqProcess, Type type) {
+    this.sqProcess = Optional.ofNullable(sqProcess);
+    this.type = type;
+  }
+
+  /**
+   * Gets process ref.
+   *
+   * @return the process ref
+   */
   public Optional<SQProcess> getProcessRef() {
-    throw new UnsupportedOperationException();
+    return sqProcess;
   }
 
+  /**
+   * Gets type of change
+   *
+   * @return {@link Type}
+   */
   public Type getType() {
-    throw new UnsupportedOperationException();
+    return type;
   }
 }

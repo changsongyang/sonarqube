@@ -24,7 +24,6 @@ package org.sonar.process.monitor2;
 
 import java.util.List;
 import java.util.function.Consumer;
-import org.sonar.process.monitor.JavaCommand;
 
 /**
  * TODO no shutdown hook in this class
@@ -39,4 +38,5 @@ public interface ProcessGroupMonitor {
 
   void register(Consumer<ChangeEvent> listener);
 
+  void close();
 }
