@@ -1,6 +1,25 @@
+/*
+ * SonarQube
+ * Copyright (C) 2009-2017 SonarSource SA
+ * mailto:info AT sonarsource DOT com
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
 package org.sonar.process.monitor2;
 
-import java.util.Optional;
+import org.sonar.process.ProcessId;
 
 
 /**
@@ -26,27 +45,22 @@ public class ChangeEvent {
     STOP_REQUESTED,
   }
 
-  private final Optional<SQProcess> sqProcess;
   private final Type type;
+  private final ProcessId processId;
+  private final SQProcess.State currentState;
+  private final SQProcess.State previousState;
 
   /**
    * Instantiates a new Change event.
    *
-   * @param sqProcess the sq process
+   * @param previousState the previous state of the processId
    * @param type      the type
    */
-  public ChangeEvent(SQProcess sqProcess, Type type) {
-    this.sqProcess = Optional.ofNullable(sqProcess);
+  ChangeEvent(ProcessId processId, SQProcess.State currentState, SQProcess.State previousState, Type type) {
+    this.processId = processId;
+    this.currentState = currentState;
+    this.previousState = previousState;
     this.type = type;
-  }
-
-  /**
-   * Gets process ref.
-   *
-   * @return the process ref
-   */
-  public Optional<SQProcess> getProcessRef() {
-    return sqProcess;
   }
 
   /**
@@ -56,5 +70,17 @@ public class ChangeEvent {
    */
   public Type getType() {
     return type;
+  }
+
+  public ProcessId getProcessId() {
+    return processId;
+  }
+
+  public SQProcess.State getCurrentState() {
+    return currentState;
+  }
+
+  public SQProcess.State getPreviousState() {
+    return previousState;
   }
 }

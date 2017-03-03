@@ -35,7 +35,7 @@ class WatcherThread extends Thread {
     // this name is different than Thread#toString(), which includes name, priority
     // and thread group
     // -> do not override toString()
-    super(String.format("Watch[%s]", sqProcess.getId().getKey()));
+    super(String.format("Watch[%s]", sqProcess.getProcessId().getKey()));
     this.sqProcess = sqProcess;
   }
 
@@ -47,7 +47,7 @@ class WatcherThread extends Thread {
         sqProcess.getProcess().waitFor();
         sqProcess.getCommands().acknowledgeAskForRestart();
 
-        // finalize status of ProcessRef
+        // finalize status of sqProcess
         sqProcess.stop();
 
         stopped = true;

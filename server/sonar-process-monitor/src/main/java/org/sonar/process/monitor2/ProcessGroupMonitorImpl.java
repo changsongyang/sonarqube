@@ -1,23 +1,21 @@
 /*
+ * SonarQube
+ * Copyright (C) 2009-2017 SonarSource SA
+ * mailto:info AT sonarsource DOT com
  *
- *  * SonarQube
- *  * Copyright (C) 2009-2017 SonarSource SA
- *  * mailto:info AT sonarsource DOT com
- *  *
- *  * This program is free software; you can redistribute it and/or
- *  * modify it under the terms of the GNU Lesser General Public
- *  * License as published by the Free Software Foundation; either
- *  * version 3 of the License, or (at your option) any later version.
- *  *
- *  * This program is distributed in the hope that it will be useful,
- *  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  * Lesser General Public License for more details.
- *  *
- *  * You should have received a copy of the GNU Lesser General Public License
- *  * along with this program; if not, write to the Free Software Foundation,
- *  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
  *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
 package org.sonar.process.monitor2;
@@ -61,9 +59,9 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   @Override
   public SQProcess start(@Nonnull JavaCommand javaCommand) {
     processes.forEach(sqProcess -> {
-      if (sqProcess.getId().equals(javaCommand.getProcessId())) {
+      if (sqProcess.getProcessId().equals(javaCommand.getProcessId())) {
         throw new IllegalStateException(
-          String.format("Can not start multiple times %s", sqProcess.getId().getKey())
+          String.format("Can not start multiple times %s", sqProcess.getProcessId().getKey())
         );
       }
     });
@@ -77,10 +75,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
         String.format("%s failed to start", sqProcess),
         e
       );
-      if (sqProcess == null) {
-        sqProcess = new SQProcess(javaCommand, null, null,null);
-      }
-      sendChangeEvent(new ChangeEvent(sqProcess, ChangeEvent.Type.PROCESS_STATE_CHANGE));
+      sendChangeEvent(new ChangeEvent(javaCommand.getProcessId(), SQProcess.State.STOPPED, SQProcess.State.INIT, ChangeEvent.Type.PROCESS_STATE_CHANGE));
     }
 
     return sqProcess;
@@ -90,7 +85,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   public void stop(SQProcess sqProcess) {
     if (!processes.contains(sqProcess)) {
       throw new IllegalStateException(
-        String.format("Can not stop %s since it has not been started", sqProcess.getId().getKey())
+        String.format("Can not stop %s since it has not been started", sqProcess.getProcessId().getKey())
       );
     }
     sqProcess.stop();
@@ -111,8 +106,13 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   public void stopAll() {
     stateWatcherThread.finish();
     launcher.close();
-    // TODO
-    throw new UnsupportedOperationException();
+    processes.forEach(process -> {
+      try {
+        stop(process);
+      } catch (IllegalStateException e) {
+        LOG.error("Unable to stop a process", e);
+      }
+    });
   }
 
   /**
@@ -123,7 +123,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
     private final Map<SQProcess, SQProcess.State> previousStates = new HashMap<>();
     private boolean stopRequested = false;
 
-    private StateWatcherThread(@Nonnull List<SQProcess> sqProcesses) {
+    StateWatcherThread(@Nonnull List<SQProcess> sqProcesses) {
       super("State watcher");
       this.sqProcesses = sqProcesses;
     }
@@ -147,9 +147,9 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
     private void detectStateChanges() {
       sqProcesses.forEach(sqProcess -> {
         SQProcess.State previousState = previousStates.get(sqProcess);
-        if (sqProcess.getState() != previousState) {
-          // TODO send a bean instead of sqProcess.
-          sendChangeEvent(new ChangeEvent(sqProcess, ChangeEvent.Type.PROCESS_STATE_CHANGE));
+        SQProcess.State currentState = sqProcess.getState();
+        if (currentState != previousState) {
+          sendChangeEvent(new ChangeEvent(sqProcess.getProcessId(), currentState, previousState, ChangeEvent.Type.PROCESS_STATE_CHANGE));
           previousStates.put(sqProcess, sqProcess.getState());
         }
       });

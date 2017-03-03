@@ -1,5 +1,26 @@
+/*
+ * SonarQube
+ * Copyright (C) 2009-2017 SonarSource SA
+ * mailto:info AT sonarsource DOT com
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
 package org.sonar.process.monitor2;
 
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.process.ProcessCommands;
@@ -17,9 +38,8 @@ public class SQProcess {
   private final ProcessCommands commands;
   private final Process process;
   private final StreamGobbler gobbler;
-  private State state;
 
-  SQProcess(JavaCommand javaCommand, ProcessCommands commands, Process process, StreamGobbler gobbler) {
+  SQProcess(@Nonnull JavaCommand javaCommand, @Nonnull ProcessCommands commands, @Nonnull Process process, @Nonnull StreamGobbler gobbler) {
     this.javaCommand = javaCommand;
     this.commands = commands;
     this.process = process;
@@ -59,12 +79,12 @@ public class SQProcess {
   }
 
 
-  public ProcessId getId() {
+  public ProcessId getProcessId() {
     return javaCommand.getProcessId();
   }
 
   public State getState() {
-    if (process == null || !ProcessUtils.isAlive(process)) {
+    if (!ProcessUtils.isAlive(process)) {
       return State.STOPPED;
     }
     if (commands.isUp()) {
@@ -84,4 +104,6 @@ public class SQProcess {
   public String toString() {
     return String.format("Process[%s]", javaCommand.getProcessId());
   }
+
+
 }
