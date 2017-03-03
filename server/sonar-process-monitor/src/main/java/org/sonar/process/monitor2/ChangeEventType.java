@@ -1,4 +1,4 @@
-/*
+package org.sonar.process.monitor2;/*
  * SonarQube
  * Copyright (C) 2009-2017 SonarSource SA
  * mailto:info AT sonarsource DOT com
@@ -17,38 +17,13 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-package org.sonar.process.monitor2;
 
-import org.sonar.process.ProcessId;
-
-
-/**
- * The change event from a SQProcess
- */
-public class ChangeEvent {
-  private final ChangeEventType type;
-  private final ProcessId processId;
-
+public enum ChangeEventType {
   /**
-   * Instantiates a new Change event.
-   *
-   * @param type      the type
+   * A stop was requested by a process
    */
-  ChangeEvent(ProcessId processId, ChangeEventType type) {
-    this.processId = processId;
-    this.type = type;
-  }
-
-  /**
-   * Gets type of change
-   *
-   * @return {@link ChangeEventType}
+  OPERATIONAL, STOP_REQUESTED, STOPPED, STARTED, /**
+   * A restart was requested by a process
    */
-  public ChangeEventType getType() {
-    return type;
-  }
-
-  public ProcessId getProcessId() {
-    return processId;
-  }
+  RESTART_REQUESTED
 }

@@ -31,6 +31,7 @@ import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sonar.process.ProcessId;
 
 public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   private static final Logger LOG = LoggerFactory.getLogger(ProcessGroupMonitorImpl.class);
@@ -38,6 +39,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
 
   private final List<SQProcess> processes = new ArrayList<>();
   private final List<Consumer<ChangeEvent>> listeners = new ArrayList<>();
+  private final Map<ProcessId, SQProcessTransitions> transitions = Collections.synchronizedMap(new HashMap<>());
   private final FileSystem fileSystem;
   private final List<WatcherThread> watcherThreads = new CopyOnWriteArrayList<>();
   private final StateWatcherThread stateWatcherThread = new StateWatcherThread(Collections.unmodifiableList(processes));
@@ -58,37 +60,34 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
 
   @Override
   public SQProcess start(@Nonnull JavaCommand javaCommand) {
-    processes.forEach(sqProcess -> {
-      if (sqProcess.getProcessId().equals(javaCommand.getProcessId())) {
-        throw new IllegalStateException(
-          String.format("Can not start multiple times %s", sqProcess.getProcessId().getKey())
+    if (tryToMoveTo(javaCommand.getProcessId(), SQProcessTransitions.State.STARTING)) {
+      SQProcess sqProcess = null;
+      try {
+        sqProcess = launcher.launch(javaCommand);
+        monitor(sqProcess);
+      } catch (InterruptedException | RuntimeException e) {
+        LOG.error(
+          String.format("%s failed to start", sqProcess),
+          e
         );
+        sendChangeEvent(javaCommand.getProcessId(), ChangeEventType.STOPPED);
       }
-    });
 
-    SQProcess sqProcess = null;
-    try {
-      sqProcess = launcher.launch(javaCommand);
-      monitor(sqProcess);
-    } catch (InterruptedException | RuntimeException e) {
-      LOG.error(
-        String.format("%s failed to start", sqProcess),
-        e
-      );
-      sendChangeEvent(new ChangeEvent(javaCommand.getProcessId(), SQProcess.State.STOPPED, SQProcess.State.INIT, ChangeEvent.Type.PROCESS_STATE_CHANGE));
+      return sqProcess;
     }
-
-    return sqProcess;
+    throw new IllegalStateException(
+      String.format("Can not start multiple times %s", javaCommand.getProcessId().getKey())
+    );
   }
 
   @Override
   public void stop(SQProcess sqProcess) {
-    if (!processes.contains(sqProcess)) {
-      throw new IllegalStateException(
-        String.format("Can not stop %s since it has not been started", sqProcess.getProcessId().getKey())
-      );
+    if (tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STOPPING)) {
+      sqProcess.stop();
     }
-    sqProcess.stop();
+    throw new IllegalStateException(
+      String.format("Can not stop %s since it has not been started", sqProcess.getProcessId().getKey())
+    );
   }
 
   @Override
@@ -146,13 +145,45 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
 
     private void detectStateChanges() {
       sqProcesses.forEach(sqProcess -> {
-        SQProcess.State previousState = previousStates.get(sqProcess);
         SQProcess.State currentState = sqProcess.getState();
+        SQProcess.State previousState = previousStates.get(sqProcess);
         if (currentState != previousState) {
-          sendChangeEvent(new ChangeEvent(sqProcess.getProcessId(), currentState, previousState, ChangeEvent.Type.PROCESS_STATE_CHANGE));
+          switch (currentState) {
+            case ASKED_FOR_RESTART:
+              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.RESTART_REQUESTED);
+              break;
+            case ASKED_FOR_SHUTDOWN:
+              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOP_REQUESTED);
+              break;
+            case UP:
+              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STARTED);
+              break;
+            case OPERATIONAL:
+              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.OPERATIONAL);
+              break;
+            case STOPPED:
+              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOPPED);
+              break;
+          }
+
           previousStates.put(sqProcess, sqProcess.getState());
+          moveProcessTo(sqProcess, currentState);
         }
       });
+    }
+
+    private void moveProcessTo(SQProcess sqProcess, SQProcess.State state) {
+      switch (state) {
+        case OPERATIONAL:
+          tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STARTED);
+          break;
+        case UP:
+          tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STARTED);
+          break;
+        case STOPPED:
+          tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STOPPED);
+          break;
+      }
     }
   }
 
@@ -163,7 +194,20 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
     watcherThreads.add(watcherThread);
   }
 
-  private void sendChangeEvent(ChangeEvent changeEvent) {
+  private void sendChangeEvent(ProcessId processId, ChangeEventType type) {
+    ChangeEvent changeEvent = new ChangeEvent(processId, type);
     listeners.forEach(listener -> listener.accept(changeEvent));
+  }
+
+  private boolean tryToMoveTo(ProcessId processId, SQProcessTransitions.State state) {
+    return getTransition(processId).tryToMoveTo(state);
+  }
+
+  private SQProcessTransitions getTransition(ProcessId processId) {
+    SQProcessTransitions transition = transitions.get(processId);
+    if (transition == null) {
+      transitions.put(processId, new SQProcessTransitions());
+    }
+    return transition;
   }
 }

@@ -29,7 +29,7 @@ import org.sonar.process.ProcessUtils;
 
 public class SQProcess {
   enum State {
-    INIT, STARTING, UP, OPERATIONAL, STOPPING, STOPPED
+    INIT, UP, OPERATIONAL, STOPPED, ASKED_FOR_RESTART, ASKED_FOR_SHUTDOWN
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(SQProcess.class);
@@ -84,9 +84,6 @@ public class SQProcess {
   }
 
   public State getState() {
-    if (!ProcessUtils.isAlive(process)) {
-      return State.STOPPED;
-    }
     if (commands.isUp()) {
       return State.UP;
     }
@@ -94,10 +91,15 @@ public class SQProcess {
       return State.OPERATIONAL;
     }
     if (commands.askedForStop()) {
-      return State.STOPPING;
+      return State.ASKED_FOR_SHUTDOWN;
     }
-    // TODO ? STARTING ?
-    return State.STARTING;
+    if (commands.askedForRestart()) {
+      return State.ASKED_FOR_RESTART;
+    }
+    if (!ProcessUtils.isAlive(process)) {
+      return State.STOPPED;
+    }
+    return State.INIT;
   }
 
   @Override
