@@ -37,16 +37,22 @@ import static java.lang.String.format;
 import static java.util.function.Function.identity;
 import static org.sonar.api.utils.DateUtils.formatDateTime;
 import static org.sonar.server.ws.WsUtils.writeProtobuf;
-import static org.sonarqube.ws.client.qualityprofile.QualityProfileWsParameters.*;
+import static org.sonarqube.ws.client.qualityprofile.QualityProfileWsParameters.ACTION_SEARCH;
+import static org.sonarqube.ws.client.qualityprofile.QualityProfileWsParameters.PARAM_DEFAULTS;
+import static org.sonarqube.ws.client.qualityprofile.QualityProfileWsParameters.PARAM_LANGUAGE;
+import static org.sonarqube.ws.client.qualityprofile.QualityProfileWsParameters.PARAM_PROFILE_NAME;
+import static org.sonarqube.ws.client.qualityprofile.QualityProfileWsParameters.PARAM_PROJECT_KEY;
 
 public class SearchAction implements QProfileWsAction {
 
   private final SearchDataLoader dataLoader;
   private final Languages languages;
+  private final QProfileWsSupport qProfileWsSupport;
 
-  public SearchAction(SearchDataLoader dataLoader, Languages languages) {
+  public SearchAction(SearchDataLoader dataLoader, Languages languages, QProfileWsSupport qProfileWsSupport) {
     this.dataLoader = dataLoader;
     this.languages = languages;
+    this.qProfileWsSupport = qProfileWsSupport;
   }
 
   @Override
@@ -111,6 +117,7 @@ public class SearchAction implements QProfileWsAction {
       QualityProfile.Builder profileBuilder = response.addProfilesBuilder();
 
       String profileKey = profile.key();
+      profileBuilder.setOrganization(qProfileWsSupport.getOrganizationKeyByUuid(profile.organizationUuid()));
       profileBuilder.setKey(profileKey);
       if (profile.name() != null) {
         profileBuilder.setName(profile.name());

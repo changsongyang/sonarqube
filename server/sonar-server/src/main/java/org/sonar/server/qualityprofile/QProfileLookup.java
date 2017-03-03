@@ -19,12 +19,10 @@
  */
 package org.sonar.server.qualityprofile;
 
-import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
 import java.util.List;
 import javax.annotation.CheckForNull;
-import javax.annotation.Nonnull;
 import org.sonar.api.server.ServerSide;
+import org.sonar.core.util.stream.Collectors;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.qualityprofile.QualityProfileDto;
@@ -78,20 +76,11 @@ public class QProfileLookup {
   }
 
   private static List<QProfile> toQProfiles(List<QualityProfileDto> dtos) {
-    return newArrayList(Iterables.transform(dtos, ToQProfile.INSTANCE));
+    return dtos.stream().map(QProfile::from).collect(Collectors.toList(dtos.size()));
   }
 
   @CheckForNull
   private QualityProfileDto findQualityProfile(String name, String language, DbSession session) {
     return db.qualityProfileDao().selectByNameAndLanguage(name, language, session);
-  }
-
-  private enum ToQProfile implements Function<QualityProfileDto, QProfile> {
-    INSTANCE;
-
-    @Override
-    public QProfile apply(@Nonnull QualityProfileDto input) {
-      return QProfile.from(input);
-    }
   }
 }

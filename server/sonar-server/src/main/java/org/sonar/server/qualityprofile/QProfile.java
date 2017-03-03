@@ -28,6 +28,7 @@ import org.sonar.db.qualityprofile.QualityProfileDto;
 public class QProfile {
 
   private int id;
+  private String organizationUuid;
   private String key;
   private String name;
   private String language;
@@ -69,6 +70,15 @@ public class QProfile {
 
   public QProfile setLanguage(String language) {
     this.language = language;
+    return this;
+  }
+
+  public String organizationUuid() {
+    return organizationUuid;
+  }
+
+  public QProfile setOrganizationUuid(String organizationUuid) {
+    this.organizationUuid = organizationUuid;
     return this;
   }
 
@@ -135,6 +145,7 @@ public class QProfile {
 
   public static QProfile from(QualityProfileDto dto) {
     return new QProfile()
+      .setOrganizationUuid(dto.getOrganizationUuid())
       .setId(dto.getId())
       .setKey(dto.getKey())
       .setName(dto.getName())

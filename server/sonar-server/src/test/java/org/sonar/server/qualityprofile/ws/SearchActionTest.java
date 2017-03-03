@@ -42,7 +42,6 @@ import org.sonar.db.qualityprofile.QualityProfileDbTester;
 import org.sonar.db.qualityprofile.QualityProfileDto;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.language.LanguageTesting;
-import org.sonar.server.organization.DefaultOrganizationProvider;
 import org.sonar.server.organization.TestDefaultOrganizationProvider;
 import org.sonar.server.qualityprofile.QProfileFactory;
 import org.sonar.server.qualityprofile.QProfileLookup;
@@ -78,7 +77,8 @@ public class SearchActionTest {
   DbClient dbClient = db.getDbClient();
   DbSession dbSession = db.getSession();
   QualityProfileDao qualityProfileDao = dbClient.qualityProfileDao();
-  private DefaultOrganizationProvider defaultOrganizationProvider = TestDefaultOrganizationProvider.from(db);
+  private QProfileWsSupport qProfileWsSupport;
+  private OrganizationDto organization;
 
   private ActiveRuleIndex activeRuleIndex = mock(ActiveRuleIndex.class);
 
@@ -93,6 +93,7 @@ public class SearchActionTest {
     xoo2 = LanguageTesting.newLanguage("xoo2");
 
     Languages languages = new Languages(xoo1, xoo2);
+    qProfileWsSupport = new QProfileWsSupport(dbClient, null, TestDefaultOrganizationProvider.from(db));
     ws = new WsActionTester(new SearchAction(
       new SearchDataLoader(
         languages,
@@ -100,7 +101,9 @@ public class SearchActionTest {
         new QProfileFactory(dbClient),
         dbClient,
         new ComponentFinder(dbClient), activeRuleIndex),
-      languages));
+      languages,
+      qProfileWsSupport));
+    organization = db.organizations().insert();
   }
 
   @Test
@@ -154,6 +157,7 @@ public class SearchActionTest {
   public void search_map_dates() {
     long time = DateUtils.parseDateTime("2016-12-22T19:10:03+0100").getTime();
     qualityProfileDb.insertQualityProfiles(newQualityProfileDto()
+      .setOrganizationUuid(organization.getUuid())
       .setLanguage(xoo1.getKey())
       .setRulesUpdatedAt("2016-12-21T19:10:03+0100")
       .setLastUsed(time)
@@ -171,7 +175,7 @@ public class SearchActionTest {
   public void search_for_language() throws Exception {
     qualityProfileDb.insertQualityProfiles(
       QualityProfileDto.createFor("sonar-way-xoo1-12345")
-        .setOrganizationUuid(defaultOrganizationProvider.get().getUuid())
+        .setOrganizationUuid(organization.getUuid())
         .setLanguage(xoo1.getKey())
         .setName("Sonar way"));
 
@@ -220,7 +224,7 @@ public class SearchActionTest {
 
   @Test
   public void search_for_default_qp_with_profile_name() {
-    String orgUuid = defaultOrganizationProvider.get().getUuid();
+    String orgUuid = organization.getUuid();
     QualityProfileDto qualityProfileOnXoo1 = QualityProfileDto.createFor("sonar-way-xoo1-12345")
       .setOrganizationUuid(orgUuid)
       .setLanguage(xoo1.getKey())

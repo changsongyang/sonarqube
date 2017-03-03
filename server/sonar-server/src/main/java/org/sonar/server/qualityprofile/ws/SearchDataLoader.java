@@ -238,6 +238,7 @@ public class SearchDataLoader {
     @Override
     public QProfile apply(QualityProfileDto input) {
       return new QProfile()
+        .setOrganizationUuid(input.getOrganizationUuid())
         .setKey(input.getKey())
         .setName(input.getName())
         .setLanguage(input.getLanguage())
