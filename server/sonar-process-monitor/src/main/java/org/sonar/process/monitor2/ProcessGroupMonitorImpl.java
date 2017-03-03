@@ -70,6 +70,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
           String.format("%s failed to start", sqProcess),
           e
         );
+        tryToMoveTo(javaCommand.getProcessId(), SQProcessTransitions.State.STOPPED);
         sendChangeEvent(javaCommand.getProcessId(), ChangeEventType.STOPPED);
       }
 
@@ -148,24 +149,6 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
         SQProcess.State currentState = sqProcess.getState();
         SQProcess.State previousState = previousStates.get(sqProcess);
         if (currentState != previousState) {
-          switch (currentState) {
-            case ASKED_FOR_RESTART:
-              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.RESTART_REQUESTED);
-              break;
-            case ASKED_FOR_SHUTDOWN:
-              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOP_REQUESTED);
-              break;
-            case UP:
-              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STARTED);
-              break;
-            case OPERATIONAL:
-              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.OPERATIONAL);
-              break;
-            case STOPPED:
-              sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOPPED);
-              break;
-          }
-
           previousStates.put(sqProcess, sqProcess.getState());
           moveProcessTo(sqProcess, currentState);
         }
@@ -174,13 +157,22 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
 
     private void moveProcessTo(SQProcess sqProcess, SQProcess.State state) {
       switch (state) {
+        case ASKED_FOR_RESTART:
+          sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.RESTART_REQUESTED);
+          break;
+        case ASKED_FOR_SHUTDOWN:
+          sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOP_REQUESTED);
+          break;
         case OPERATIONAL:
+          sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.OPERATIONAL);
           tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STARTED);
           break;
         case UP:
+          sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STARTED);
           tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STARTED);
           break;
         case STOPPED:
+          sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOPPED);
           tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STOPPED);
           break;
       }
