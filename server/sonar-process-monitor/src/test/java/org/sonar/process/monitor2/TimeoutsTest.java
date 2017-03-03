@@ -17,16 +17,23 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-
 package org.sonar.process.monitor2;
 
-public enum ChangeEventType {
-  /**
-   * A stop was requested by a process
-   */
-  OPERATIONAL, STOP_REQUESTED, STOPPED, STARTED,
-  /**
-   * A restart was requested by a process
-   */
-  RESTART_REQUESTED
+import org.junit.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class TimeoutsTest {
+
+  @Test
+  public void test_default_values() throws Exception {
+    Timeouts timeouts = new Timeouts();
+    assertThat(timeouts.getTerminationTimeout()).isGreaterThan(1000L);
+  }
+
+  @Test
+  public void test_values() throws Exception {
+    Timeouts timeouts = new Timeouts(3L);
+    assertThat(timeouts.getTerminationTimeout()).isEqualTo(3L);
+  }
 }

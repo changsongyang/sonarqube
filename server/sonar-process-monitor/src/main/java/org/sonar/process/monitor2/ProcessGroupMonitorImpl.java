@@ -20,6 +20,7 @@
 
 package org.sonar.process.monitor2;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,9 +34,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.process.ProcessId;
 
+import static org.sonar.process.DefaultProcessCommands.reset;
+
 public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   private static final Logger LOG = LoggerFactory.getLogger(ProcessGroupMonitorImpl.class);
-  private static final long WATCH_DELAY_MS = 500L;
+  private static final long WATCH_DELAY_MS = 50L;
 
   private final List<SQProcess> processes = new ArrayList<>();
   private final List<Consumer<ChangeEvent>> listeners = new ArrayList<>();
@@ -51,6 +54,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   public ProcessGroupMonitorImpl(FileSystem fileSystem) {
     this.fileSystem = fileSystem;
     this.launcher = new JavaProcessLauncher(TIMEOUTS, fileSystem.getTempDir());
+    stateWatcherThread.start();
   }
 
   @Override
@@ -60,6 +64,7 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
 
   @Override
   public SQProcess start(@Nonnull JavaCommand javaCommand) {
+    // TODO : Do not return SQProcess
     if (tryToMoveTo(javaCommand.getProcessId(), SQProcessTransitions.State.STARTING)) {
       SQProcess sqProcess = null;
       try {
@@ -73,11 +78,11 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
         tryToMoveTo(javaCommand.getProcessId(), SQProcessTransitions.State.STOPPED);
         sendChangeEvent(javaCommand.getProcessId(), ChangeEventType.STOPPED);
       }
-
+      processes.add(sqProcess);
       return sqProcess;
     }
     throw new IllegalStateException(
-      String.format("Can not start multiple times %s", javaCommand.getProcessId().getKey())
+      String.format("Can not start multiple times [%s]", javaCommand.getProcessId().getKey())
     );
   }
 
@@ -85,10 +90,13 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   public void stop(SQProcess sqProcess) {
     if (tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STOPPING)) {
       sqProcess.stop();
+    } else {
+      // TODO can be safely removed
+
+      throw new IllegalStateException(
+        String.format("Can not stop %s since it has not been started", sqProcess.getProcessId().getKey())
+      );
     }
-    throw new IllegalStateException(
-      String.format("Can not stop %s since it has not been started", sqProcess.getProcessId().getKey())
-    );
   }
 
   @Override
@@ -100,19 +108,27 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   public void close() {
     stateWatcherThread.finish();
     launcher.close();
+    try {
+      fileSystem.reset();
+    } catch (IOException e) {
+      LOG.error("Unable to reset filesystem", e);
+    }
+    // reset sharedmemory of App
+    reset(fileSystem.getTempDir(), ProcessId.APP.getIpcIndex());
   }
 
   @Override
   public void stopAll() {
-    stateWatcherThread.finish();
-    launcher.close();
     processes.forEach(process -> {
       try {
-        stop(process);
+        if (tryToMoveTo(process.getProcessId(), SQProcessTransitions.State.STOPPING)) {
+          stop(process);
+        }
       } catch (IllegalStateException e) {
         LOG.error("Unable to stop a process", e);
       }
     });
+    close();
   }
 
   /**
@@ -172,6 +188,8 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
           tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STARTED);
           break;
         case STOPPED:
+          // If stopped clean up the shared memory
+          reset(fileSystem.getTempDir(), sqProcess.getProcessId().getIpcIndex());
           sendChangeEvent(sqProcess.getProcessId(), ChangeEventType.STOPPED);
           tryToMoveTo(sqProcess.getProcessId(), SQProcessTransitions.State.STOPPED);
           break;
@@ -195,10 +213,11 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
     return getTransition(processId).tryToMoveTo(state);
   }
 
-  private SQProcessTransitions getTransition(ProcessId processId) {
+  private synchronized SQProcessTransitions getTransition(ProcessId processId) {
     SQProcessTransitions transition = transitions.get(processId);
     if (transition == null) {
-      transitions.put(processId, new SQProcessTransitions());
+      transition = new SQProcessTransitions();
+      transitions.put(processId, transition);
     }
     return transition;
   }

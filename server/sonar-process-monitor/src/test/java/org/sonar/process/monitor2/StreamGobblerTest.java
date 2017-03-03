@@ -17,16 +17,34 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-
 package org.sonar.process.monitor2;
 
-public enum ChangeEventType {
-  /**
-   * A stop was requested by a process
-   */
-  OPERATIONAL, STOP_REQUESTED, STOPPED, STARTED,
-  /**
-   * A restart was requested by a process
-   */
-  RESTART_REQUESTED
+import java.io.InputStream;
+import org.apache.commons.io.IOUtils;
+import org.junit.Test;
+import org.slf4j.Logger;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyZeroInteractions;
+
+public class StreamGobblerTest {
+
+  @Test
+  public void forward_stream_to_log() {
+    InputStream stream = IOUtils.toInputStream("one\nsecond log\nthird log\n");
+    Logger logger = mock(Logger.class);
+
+    StreamGobbler gobbler = new StreamGobbler(stream, "WEB", logger);
+    verifyZeroInteractions(logger);
+
+    gobbler.start();
+    StreamGobbler.waitUntilFinish(gobbler);
+
+    verify(logger).info("one");
+    verify(logger).info("second log");
+    verify(logger).info("third log");
+    verifyNoMoreInteractions(logger);
+  }
 }

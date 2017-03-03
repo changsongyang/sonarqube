@@ -21,7 +21,6 @@ package org.sonar.process.monitor2;
 
 import org.sonar.process.ProcessId;
 
-
 /**
  * The change event from a SQProcess
  */
@@ -50,5 +49,37 @@ public class ChangeEvent {
 
   public ProcessId getProcessId() {
     return processId;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ChangeEvent)) {
+      return false;
+    }
+
+    ChangeEvent that = (ChangeEvent) o;
+
+    if (type != that.type) {
+      return false;
+    }
+    return processId == that.processId;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = type != null ? type.hashCode() : 0;
+    result = 31 * result + (processId != null ? processId.hashCode() : 0);
+    return result;
+  }
+
+  @Override
+  public String toString() {
+    return "ChangeEvent{" +
+      "type=" + type +
+      ", processId=" + processId +
+      '}';
   }
 }

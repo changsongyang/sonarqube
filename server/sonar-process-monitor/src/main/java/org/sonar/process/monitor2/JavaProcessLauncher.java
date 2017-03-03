@@ -78,7 +78,8 @@ class JavaProcessLauncher {
         e);
       // just in case
       ProcessUtils.sendKillSignal(process);
-      return new SQProcess(javaCommand, commands, process, inputGobbler);
+      //return new SQProcess(javaCommand, commands, process, inputGobbler);
+      throw new IllegalStateException("Fail to launch [" + javaCommand.getProcessId().getKey() + "]", e);
     }
   }
 

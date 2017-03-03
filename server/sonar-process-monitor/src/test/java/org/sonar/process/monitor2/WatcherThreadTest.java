@@ -17,16 +17,26 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-
 package org.sonar.process.monitor2;
 
-public enum ChangeEventType {
-  /**
-   * A stop was requested by a process
-   */
-  OPERATIONAL, STOP_REQUESTED, STOPPED, STARTED,
-  /**
-   * A restart was requested by a process
-   */
-  RESTART_REQUESTED
+import org.junit.Test;
+import org.mockito.Mockito;
+import org.sonar.process.ProcessId;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+public class WatcherThreadTest {
+
+  @Test(timeout = 10000L)
+  public void continue_even_if_interrupted() throws Exception {
+    SQProcess sqProcess = mock(SQProcess.class, Mockito.RETURNS_DEEP_STUBS);
+    when(sqProcess.getProcessId()).thenReturn(ProcessId.COMPUTE_ENGINE);
+    when(sqProcess.getProcess().waitFor()).thenThrow(new InterruptedException()).thenReturn(0);
+    WatcherThread watcher = new WatcherThread(sqProcess);
+    watcher.start();
+    watcher.join();
+    verify(sqProcess).stop();
+  }
 }

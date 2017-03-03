@@ -84,6 +84,9 @@ public class SQProcess {
   }
 
   public State getState() {
+    if (!ProcessUtils.isAlive(process)) {
+      return State.STOPPED;
+    }
     if (commands.isUp()) {
       return State.UP;
     }
@@ -95,9 +98,6 @@ public class SQProcess {
     }
     if (commands.askedForRestart()) {
       return State.ASKED_FOR_RESTART;
-    }
-    if (!ProcessUtils.isAlive(process)) {
-      return State.STOPPED;
     }
     return State.INIT;
   }

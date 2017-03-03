@@ -19,6 +19,8 @@
  */
 package org.sonar.process.monitor2;
 
+import javax.annotation.Nonnull;
+
 /**
  * This thread blocks as long as the monitored process is physically alive.
  * It avoids from executing {@link Process#exitValue()} at a fixed rate :
@@ -31,7 +33,7 @@ package org.sonar.process.monitor2;
 class WatcherThread extends Thread {
   private final SQProcess sqProcess;
 
-  WatcherThread(SQProcess sqProcess) {
+  WatcherThread(@Nonnull SQProcess sqProcess) {
     // this name is different than Thread#toString(), which includes name, priority
     // and thread group
     // -> do not override toString()
