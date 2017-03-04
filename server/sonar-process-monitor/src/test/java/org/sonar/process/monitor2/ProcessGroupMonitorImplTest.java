@@ -19,6 +19,7 @@
  */
 package org.sonar.process.monitor2;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -94,27 +95,105 @@ public class ProcessGroupMonitorImplTest {
   }
 
   @Test
-  public void receive_events() throws Exception {
+  public void receive_starting_stopping_events() throws Exception {
     List<ChangeEvent> receivedEvents = new ArrayList<>();
+    Object lock = new Object();
 
     underTest = newProcessGroupMonitor();
-    underTest.register(changeEvent -> receivedEvents.add(changeEvent));
+    underTest.register(changeEvent -> {
+      receivedEvents.add(changeEvent);
+      synchronized (lock) {
+        lock.notify();
+      }
+    });
 
     JavaCommand es = newESJavaCommand();
     SQProcess sqProcess = underTest.start(es);
-    Thread.sleep(1_000);
-    underTest.stop(sqProcess);
-    Thread.sleep(1_000);
-    assertThat(receivedEvents).containsExactly(
-      new ChangeEvent(es.getProcessId(), ChangeEventType.STARTED),
-      new ChangeEvent(es.getProcessId(), ChangeEventType.STOPPED)
-    );
+    synchronized (lock) {
+      lock.wait(1_000);
+      assertThat(receivedEvents).containsExactly(
+        new ChangeEvent(es.getProcessId(), ChangeEventType.STARTED)
+      );
+    }
+    synchronized (lock) {
+      underTest.stop(sqProcess);
+      lock.wait(1_000);
+      assertThat(receivedEvents).containsExactly(
+        new ChangeEvent(es.getProcessId(), ChangeEventType.STARTED),
+        new ChangeEvent(es.getProcessId(), ChangeEventType.STOPPED)
+      );
+    }
+    underTest.stopAll();
+  }
+
+  @Test
+  public void receive_all_events() throws Exception {
+    List<ChangeEvent> receivedEvents = new ArrayList<>();
+    Object lock = new Object();
+    SQProcess sqProcess = mock(SQProcess.class);
+    when(sqProcess.getProcessId()).thenReturn(ProcessId.ELASTICSEARCH);
+
+    underTest = newProcessGroupMonitor(Lists.newArrayList(sqProcess));
+    underTest.register(changeEvent -> {
+      receivedEvents.add(changeEvent);
+      synchronized (lock) {
+        lock.notify();
+      }
+    });
+
+    for (SQProcess.State state : SQProcess.State.values()) {
+      receivedEvents.clear();
+      when(sqProcess.getState()).thenReturn(state);
+
+      synchronized (lock) {
+        lock.wait(1_000);
+        switch (state) {
+          case STOPPED:
+            assertThat(receivedEvents).containsExactly(
+              new ChangeEvent(ProcessId.ELASTICSEARCH, ChangeEventType.STOPPED)
+            );
+            break;
+          case ASKED_FOR_RESTART:
+            assertThat(receivedEvents).containsExactly(
+              new ChangeEvent(ProcessId.ELASTICSEARCH, ChangeEventType.RESTART_REQUESTED)
+            );
+            break;
+          case ASKED_FOR_SHUTDOWN:
+            assertThat(receivedEvents).containsExactly(
+              new ChangeEvent(ProcessId.ELASTICSEARCH, ChangeEventType.STOP_REQUESTED)
+            );
+            break;
+          case UP:
+            assertThat(receivedEvents).containsExactly(
+              new ChangeEvent(ProcessId.ELASTICSEARCH, ChangeEventType.STARTED)
+            );
+            break;
+          case OPERATIONAL:
+            assertThat(receivedEvents).containsExactly(
+              new ChangeEvent(ProcessId.ELASTICSEARCH, ChangeEventType.OPERATIONAL)
+            );
+            break;
+          case INIT:
+            assertThat(receivedEvents).isEmpty();
+            break;
+          default:
+            throw new IllegalStateException(
+              String.format("Unknown state [%s]", state)
+            );
+        }
+      }
+    }
     underTest.stopAll();
   }
 
   private ProcessGroupMonitorImpl newProcessGroupMonitor() throws IOException {
     when(fileSystem.getTempDir()).thenReturn(tempDir);
       return new ProcessGroupMonitorImpl(fileSystem);
+  }
+
+  private ProcessGroupMonitorImpl newProcessGroupMonitor(List<SQProcess> sqProcesses) throws IOException {
+    when(fileSystem.getTempDir()).thenReturn(tempDir);
+    return new ProcessGroupMonitorImpl(fileSystem, sqProcesses);
   }
 
   private JavaCommand newESJavaCommand() {

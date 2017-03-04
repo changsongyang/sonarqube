@@ -39,6 +39,7 @@ import static org.sonar.process.DefaultProcessCommands.reset;
 public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   private static final Logger LOG = LoggerFactory.getLogger(ProcessGroupMonitorImpl.class);
   private static final long WATCH_DELAY_MS = 50L;
+  private static final Timeouts TIMEOUTS = new Timeouts();
 
   private final List<SQProcess> processes = new ArrayList<>();
   private final List<Consumer<ChangeEvent>> listeners = new ArrayList<>();
@@ -46,15 +47,19 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
   private final FileSystem fileSystem;
   private final List<WatcherThread> watcherThreads = new CopyOnWriteArrayList<>();
   private final StateWatcherThread stateWatcherThread = new StateWatcherThread(Collections.unmodifiableList(processes));
-
   @CheckForNull
   private JavaProcessLauncher launcher;
-  private static final Timeouts TIMEOUTS = new Timeouts();
 
   public ProcessGroupMonitorImpl(FileSystem fileSystem) {
     this.fileSystem = fileSystem;
     this.launcher = new JavaProcessLauncher(TIMEOUTS, fileSystem.getTempDir());
     stateWatcherThread.start();
+  }
+
+  // VisibleForTesting
+  ProcessGroupMonitorImpl(FileSystem fileSystem, List<SQProcess> sqProcesses) {
+    this(fileSystem);
+    processes.addAll(sqProcesses);
   }
 
   @Override
@@ -75,8 +80,8 @@ public class ProcessGroupMonitorImpl implements ProcessGroupMonitor {
           String.format("%s failed to start", sqProcess),
           e
         );
-        tryToMoveTo(javaCommand.getProcessId(), SQProcessTransitions.State.STOPPED);
         sendChangeEvent(javaCommand.getProcessId(), ChangeEventType.STOPPED);
+        tryToMoveTo(javaCommand.getProcessId(), SQProcessTransitions.State.STOPPED);
       }
       processes.add(sqProcess);
       return sqProcess;

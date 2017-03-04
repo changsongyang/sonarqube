@@ -12,10 +12,20 @@ public class ChangeEventTest {
     for (ChangeEventType type : ChangeEventType.values()) {
       ChangeEvent temp = new ChangeEvent(ProcessId.APP, type);
       assertThat(changeEvent.equals(temp)).isEqualTo(type.equals(ChangeEventType.STARTED));
+      if (type.equals(ChangeEventType.STARTED)) {
+        assertThat(changeEvent.hashCode()).isEqualTo(temp.hashCode());
+      } else {
+        assertThat(changeEvent.hashCode()).isNotEqualTo(temp.hashCode());
+      }
     }
     for (ProcessId processId : ProcessId.values()) {
       ChangeEvent temp = new ChangeEvent(processId, ChangeEventType.STARTED);
       assertThat(changeEvent.equals(temp)).isEqualTo(processId.equals(ProcessId.APP));
+      if (processId.equals(ProcessId.APP)) {
+        assertThat(changeEvent.hashCode()).isEqualTo(temp.hashCode());
+      } else {
+        assertThat(changeEvent.hashCode()).isNotEqualTo(temp.hashCode());
+      }
     }
 
     assertThat(changeEvent.equals(changeEvent)).isTrue();

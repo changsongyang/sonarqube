@@ -30,8 +30,6 @@ public class ChangeEvent {
 
   /**
    * Instantiates a new Change event.
-   *
-   * @param type      the type
    */
   ChangeEvent(ProcessId processId, ChangeEventType type) {
     this.processId = processId;

@@ -104,8 +104,6 @@ public class SQProcess {
 
   @Override
   public String toString() {
-    return String.format("Process[%s]", javaCommand.getProcessId());
+    return String.format("Process[%s]", javaCommand.getProcessId().getKey());
   }
-
-
 }
